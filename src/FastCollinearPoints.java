@@ -8,44 +8,37 @@ public class FastCollinearPoints {
     // Number of line segments
     private int nLines = 0;
 
-    // Creating a placeholder for points in memory
-    private final Point[] pointsMemory;
-
-    // The number of points
-    private final int nPoints;
+    // Linesegment placeholder
+    private LineSegment[] lines;
 
     // The fast collinear point search
     public FastCollinearPoints(Point[] points) {
-        // Checking for proper input
+        // Checking if the points are are not a null object
         if (points == null) throw new IllegalArgumentException();
 
-        for (int i = 0; i < points.length; i++) {
-            if (points[i] == null) throw new IllegalArgumentException();
-        }
-
-        // Checking for duplicates
+        // Checking for duplicates and null points
         for (int i = 0; i < points.length - 1; i++) {
+            if (points[i] == null) throw new IllegalArgumentException();
             for (int j = i + 1; j < points.length; j++) {
+                if (points[j] == null) throw new IllegalArgumentException();
                 if (points[i].compareTo(points[j]) == 0) {
                     throw new IllegalArgumentException();
                 }
             }
         }
 
+        // Saving the points to memory
+        Point[] pointsMemory = new Point[points.length];
+        System.arraycopy(points, 0, pointsMemory, 0, points.length);
+
+        // Sorting the points
+        Arrays.sort(pointsMemory);
+
         // Saving the total number of points
-        nPoints = points.length;
+        int nPoints = pointsMemory.length;
 
-        // Saving the points to memory from the constructor call
-        pointsMemory = new Point[nPoints];
-        for (int i = 0; i < nPoints; i++) {
-            pointsMemory[i] = points[i];
-        }
-    }
-
-    // the line segments
-    public LineSegment[] segments() {
         // Copying the original array of points
-        Point[] pointsMemoryOrig = Arrays.copyOf(pointsMemory, nPoints);
+        Point[] pointsOrig = Arrays.copyOf(pointsMemory, nPoints);
 
         // Creating a temporary array list object to add the line segments in
         ArrayList<LineSegment> linesTemp = new ArrayList<>();
@@ -55,52 +48,68 @@ public class FastCollinearPoints {
         ArrayList<Point> minPoints = new ArrayList<>();
 
         // Iterating through all the points
-        for (int i = 0; i < nPoints; i++) {
-            // Sorting the arrays based on the point i and the slope it makes with other points
-            Arrays.sort(pointsMemory, pointsMemoryOrig[i].slopeOrder());
+        if (nPoints > 1) {
+            for (int i = 0; i < nPoints; i++) {
+                // Sorting the arrays based on the original point i and the slope it makes with other points
+                Arrays.sort(pointsMemory, pointsOrig[i].slopeOrder());
 
-            for (int j = 1; j < nPoints; j++) {
-                // Placeholder for collinear points
-                ArrayList<Point> collinearPoints = new ArrayList<>();
+                // Initiating the initial slope
+                double curSlope = pointsMemory[0].slopeTo(pointsMemory[1]);
 
-                // Adding the base point and the jth point to the array list
-                collinearPoints.add(pointsMemory[0]);
-                collinearPoints.add(pointsMemory[j]);
+                // Starting the countdown
+                int j = 1;
+                // Populating the same line points
+                while (j < nPoints - 1) {
+                    if (curSlope == pointsMemory[0].slopeTo(pointsMemory[j + 1])) {
+                        // Initiating a placeholder for points
+                        ArrayList<Point> currentPoints = new ArrayList<>();
 
-                // Slope from the base point to the jth point
-                double slopeToBasePoint = pointsMemory[0].slopeTo(pointsMemory[j]);
+                        // Adding the first point
+                        currentPoints.add(pointsMemory[j]);
 
-                // Iterating through the rest of the points and checking for slopes being equal
-                while ((j + 1 < nPoints) && slopeToBasePoint == pointsMemory[0].slopeTo(pointsMemory[j + 1])) {
-                    collinearPoints.add(pointsMemory[++j]);
-                    slopeToBasePoint = pointsMemory[0].slopeTo(pointsMemory[j]);
-                }
+                        // Checking how far do the points go with the same slope
+                        int h = j;
+                        while (h < nPoints - 1) {
+                            if (curSlope == pointsMemory[0].slopeTo(pointsMemory[h + 1])) {
+                                currentPoints.add(pointsMemory[h + 1]);
+                            } else {
+                                break;
+                            }
+                            h++;
+                        }
 
-                if (collinearPoints.size() >= 4) {
-                    Point maxPoint = getMaxPoint(collinearPoints);
-                    Point minPoint = getMinPoint(collinearPoints);
+                        // Checking if the points are more than 3
+                        if (currentPoints.size() >= 3) {
+                            // Adding the original point
+                            currentPoints.add(pointsMemory[0]);
 
-                    // Checking if the min max combination is not already defined
-                    if (!hasDuplicates(maxPoints, minPoints, maxPoint, minPoint)) {
-                        // Adding to the global max and min point list
-                        maxPoints.add(maxPoint);
-                        minPoints.add(minPoint);
+                            // Searching for the min and max points on the line
+                            Point maxPoint = getMaxPoint(currentPoints);
+                            Point minPoint = getMinPoint(currentPoints);
 
-                        linesTemp.add(new LineSegment(minPoint, maxPoint));
-                        nLines++;
+                            if (!hasDuplicates(maxPoints, minPoints, maxPoint, minPoint)) {
+                                // Adding to the global max and min point list
+                                maxPoints.add(maxPoint);
+                                minPoints.add(minPoint);
+
+                                linesTemp.add(new LineSegment(minPoint, maxPoint));
+                                nLines++;
+                            }
+                        }
+                        j = h + 1;
+                    } else {
+                        curSlope = pointsMemory[0].slopeTo(pointsMemory[j + 1]);
+                        j++;
                     }
                 }
             }
         }
+        // Creating an array out of the line segments found
+        lines = linesTemp.toArray(new LineSegment[0]);
+    }
 
-        // Filling the lines object with the line segments
-        LineSegment[] lines = new LineSegment[nLines];
-        if (nLines > 0) {
-            for (int i = 0; i < nLines; i++) {
-                lines[i] = linesTemp.get(i);
-            }
-        }
-
+    // Method that returns the line segments
+    public LineSegment[] segments() {
         return lines;
     }
 
@@ -163,7 +172,7 @@ public class FastCollinearPoints {
         }
 
         // Printing out the total number of line segments found
-        System.out.println("Total found: " + collinearPoints.nLines);
+        System.out.println("Total found: " + collinearPoints.numberOfSegments());
 
         // draw the points
         StdDraw.enableDoubleBuffering();
